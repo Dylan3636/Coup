@@ -92,6 +92,7 @@ class Action(Enum):
     INCOME = 7
     FOREIGN_AID = 8
     COUP = 9
+    EMPTY_ACTION = -1
 
     def result(self):
         """Result of actions in terms of coins gained or lost"""
@@ -138,17 +139,24 @@ class Action(Enum):
                 return action
         raise Exception('Action not found!')
 
+    @staticmethod
+    def get_actions():
+        actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
+                   Action.COUP]
+        return actions
+
     def __str__(self):
         return self.name
 
 
 class Player:
-    def __init__(self, cards, turn, name):
+    def __init__(self, cards, turn, name, player_type=0):
         self.hidden_cards = cards
         self.flipped_cards = []
         self.turn = turn
         self.coins = 0
         self.name = name
+        self.player_type = player_type
 
     def flip_card(self, card):
         self.hidden_cards.remove(card)
@@ -164,14 +172,15 @@ class Player:
     def increase_coins(self, value):
         self.coins = min(self.coins + value, 10)
 
-    def decrease_coins(self, value):
+    def decrease_coins(self, value, set_coins=True):
         tmp = self.coins - abs(value)
         if tmp < 0:
             net = tmp - abs(value)
             tmp = 0
         else:
             net = abs(value)
-        self.coins = tmp
+        if set_coins:
+            self.coins = tmp
         return net
 
     def shuffle(self, card_names):
@@ -191,6 +200,15 @@ class Player:
         if self.coins == 10:
             return action is Action.COUP
         return self.coins + action.result() >= 0
+
+    def legal_action(self, action, discriminate=True):
+        if discriminate:
+            if self.player_type == 0:
+                return False
+        for card in self.hidden_cards:
+            if action in card.actions():
+                return True
+        return False
 
     def __lt__(self, other):
         return self.turn < other.turn
@@ -232,7 +250,7 @@ class Game:
                 else:
                     self.card_count[card.name] = 1
 
-    def get_state(self,p1 = None, hidden=True):
+    def get_state(self, p1=None, hidden=True):
         players = []
         coins = []
         hidden_cards = []
@@ -257,8 +275,254 @@ class Game:
 
         return state
 
+    def possible_result_states(self, state, action, player, target=None, challenge=0, allow=0):
+        if not player.action_possible(action):
+            return
+        player_id = (state['Player'] == player.name)
+        target_id = (state['Player'] == target.name)
 
+        possible_states = []
 
+        if action.value == 5:  # Steal
+            cpy = state.copy()
+            block_results = self.possible_result_states(cpy, Action.BLOCK_STEAL, player, target)  # block successful/ block challenge fail/ block challenge successful
+
+            successful_challenges = []
+            if not player.legal_action(action):
+                for challenger in self.players:
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # challenge successful
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            cpy.loc[target_id, 'Coins'] -= 2  # no challenge
+            cpy.loc[player_id, 'Coins'] += 2  # no challenge
+            if allow:
+                return possible_states.append(cpy.loc[:,['Coins', 'Hidden Cards']].values.flatten())
+
+            failed_challenges = []
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+                tmp3 = cpy.copy()
+                tmp3.loc[challenger_id, 'Hidden Cards'] -= 1  # challenge failed
+                failed_challenges.append(tmp3.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            possible_states.append(cpy.loc[:, ['Coins','Hidden Cards']].values.flatten())
+            return np.concatenate((possible_states, failed_challenges, successful_challenges, block_results)).tolist()
+
+        elif action.value == 6:  # Tax
+            cpy = state.copy()
+
+            successful_challenges = []
+            if not player.legal_action(action):
+                for challenger in self.players:
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # challenge successful
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            cpy.loc[player_id, 'Coins'] += 3  # no challenge
+
+            failed_challenges = []
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+                tmp3 = cpy.copy()
+                tmp3.loc[target_id, 'Hidden Cards'] -= 1  # challenge failed
+                failed_challenges.append(tmp3.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            possible_states.append(cpy.loc[:,['Coins','Hidden Cards']].values.flatten())
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges)).tolist()
+
+        elif action.value == 7:  # Income
+            cpy = state.copy()
+            cpy.loc[player_id, 'Coins'] += 1
+            return possible_states.append(cpy.loc[:,['Coins','Hidden Cards']].values.flatten())
+
+        elif action.value == 8:  # Foreign Aid
+            cpy = state.copy()
+            block_results = self.possible_result_states(cpy, Action.BLOCK_FOREIGN_AID, target, player)
+
+            successful_challenges = []
+            if not player.legal_action(action):
+                for challenger in self.players:
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # challenge successful
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            cpy.loc[player_id, 'Coins'] += 2  # no challenge
+            if allow:
+                return possible_states.append(cpy.loc[:,['Coins','Hidden Cards']].values.flatten())
+
+            failed_challenges = []
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+                tmp3 = cpy.copy()
+                tmp3.loc[challenger_id, 'Hidden Cards'] -= 1  # challenge failed
+                failed_challenges.append(tmp3.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges, block_results)).tolist()
+
+        elif action.value == 0:  # Assassinate
+            cpy = state.copy()
+            if player.action_possible(action):
+                cpy.loc[player_id, 'Coins'] -= 3
+                block_results = self.possible_result_states(cpy, Action.BLOCK_FOREIGN_AID, target, player)
+
+                successful_challenges = []
+                if not player.legal_action(action):
+                    for challenger in self.players:
+                        tmp = cpy.copy()
+                        tmp.loc[player_id, 'Hidden Cards'] -= 1  # challenge successful
+                        successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                cpy.loc[target_id, 'Hidden Cards'] -= 1  # no challenge
+                if allow:
+                    return possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                failed_challenges = []
+                for challenger in self.players:
+                    if challenger == target and len(target.hidden_cards)==0:
+                        continue
+                    challenger_id = (state['Player'] == challenger.name)
+                    tmp3 = cpy.copy()
+                    tmp3.loc[challenger_id, 'Hidden Cards'] -= 1  # challenge failed
+                    failed_challenges.append(tmp3.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                if challenge == 1:
+                    return np.concatenate((failed_challenges, successful_challenges))
+
+                possible_states.append(cpy.loc[:,['Coins','Hidden Cards']].values.flatten())
+
+                return np.concatenate((possible_states, failed_challenges, successful_challenges, block_results)).tolist()
+
+        elif action.value == 9:  # Coup
+            cpy = state.copy()
+            if player.action_possible(action):
+                cpy.loc[player_id, 'Coins'] -= 7
+                cpy.loc[target_id, 'Hidden Cards'] -=1
+                possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+        elif action.value == 1:  # Block Assassinate
+            cpy = state.copy()  # no challenge
+            possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+            if allow:
+                return possible_states
+
+            successful_challenges = []
+            failed_challenges = []
+
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+
+                tmp2 = state.copy()
+                tmp2.loc[challenger_id, 'Hidden Cards'] -= 1  # block challenge failed
+                failed_challenges.append(tmp2.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                if not player.legal_action(action):
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # block challenge successful
+                    if len(tmp.hidden_cards) == 1:
+                        tmp[player_id, 'Hidden Cards'] -= 1  # proceeded with assassination
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges)).tolist()
+
+        elif action.value == 2:  # Block Foreign Aid
+            cpy = state.copy()  # no challenge
+            possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+            if allow:
+                return possible_states
+
+            successful_challenges = []
+            failed_challenges = []
+
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+
+                tmp2 = state.copy()
+                tmp2.loc[challenger_id, 'Hidden Cards'] -= 1  # block challenge failed
+                failed_challenges.append(tmp2.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                if not player.legal_action(action):
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # block challenge successful
+                    tmp[target_id, 'Coins'] += 2  # proceed with foreign aid
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges)).tolist()
+
+        elif action.value == 3:  # Block Steal
+            cpy = state.copy()  # no challenge
+            possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+            if allow:
+                return possible_states
+
+            successful_challenges = []
+            failed_challenges = []
+
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+
+                tmp2 = state.copy()
+                tmp2.loc[challenger_id, 'Hidden Cards'] -= 1  # block challenge failed
+                failed_challenges.append(tmp2.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+                if not player.legal_action(action):
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # block challenge successful
+                    net = player.decrease_coins(2,set_coins=False)
+                    tmp[player_id, 'Coins'] -= net  # proceed with steal
+                    tmp[target_id, 'Coins'] += net  # proceed with steal
+
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges)).tolist()
+
+        elif action.value == 4:  # Exchange
+            cpy = state.copy()
+
+            successful_challenges = []
+            if not player.legal_action(action):
+                for _ in self.players:
+                    tmp = cpy.copy()
+                    tmp.loc[player_id, 'Hidden Cards'] -= 1  # challenge successful
+                    successful_challenges.append(tmp.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            possible_states.append(cpy.loc[:, ['Coins', 'Hidden Cards']].values.flatten())  # no challenge
+
+            if allow:
+                return possible_states.append(cpy.loc[:,['Coins','Hidden Cards']].values.flatten())
+
+            failed_challenges = []
+            for challenger in self.players:
+                challenger_id = (state['Player'] == challenger.name)
+                tmp3 = cpy.copy()
+                tmp3.loc[challenger_id, 'Hidden Cards'] -= 1  # challenge failed
+                failed_challenges.append(tmp3.loc[:, ['Coins', 'Hidden Cards']].values.flatten())
+
+            if challenge == 1:
+                return np.concatenate((failed_challenges, successful_challenges))
+
+            return np.concatenate((possible_states, failed_challenges, successful_challenges)).tolist()
 
     def begin(self):
         while len(self.players) > 1:
@@ -288,7 +552,6 @@ class Game:
         target = raw_input('Who would you like to take this action against? ')
         target = target.strip()
         return action, self.get_player(target)
-
 
     def ask_for_challenge_or_block(self, p1, p2, action):
         if action in [Action.INCOME, Action.COUP]:
@@ -476,7 +739,7 @@ class UI:
         if self.default_type == 0:
             return raw_input(s)
 
-    def print_things(self,s, recipient=None):
+    def print_things(self, s, recipient=None):
         if self.default_type == 0:
             print(s)
 
