@@ -1,237 +1,45 @@
-from enum import Enum
 import numpy as np
 import re
 from pandas import DataFrame
+from Card import Card
+from Action import Action
+from Player import Player
 
 '''
 @Author=Dylan
 '''
 
 
-class Card(Enum):
-    AMBASSADOR = 0
-    ASSASSIN = 1
-    CAPTAIN = 2
-    CONTESSA = 3
-    DUKE = 4
-
-    def action_descriptions(self):
-        if self.value == 0:
-            return 'Exchange this card with another card in the deck. Block another player from stealing from you.'
-        elif self.value == 1:
-            return 'Pay 3 coins to assassinate another player, revealing one of their character cards.'
-        elif self.value == 2:
-            return 'Steal 2 coins from another player. Block another player from stealing from you.'
-        elif self.value == 3:
-            return 'Block a player from assassinating you.'
-        else:
-            return 'Take 3 coins from the treasure. Block another player from using foreign aid'
-
-    def actions(self, name=0):
-        actions = []
-        if self.value == 0:  # Ambassador
-            actions.append(Action.EXCHANGE)
-            actions.append(Action.BLOCK_STEAL)
-        elif self.value == 1:  # Assassin
-            actions.append(Action.ASSASSINATE)
-            actions.append(Action.BLOCK_STEAL)
-        elif self.value == 2:  # Captain
-            actions.append(Action.STEAL)
-            actions.append(Action.BLOCK_STEAL)
-        elif self.value == 3:  # Contessa
-            actions.append(Action.BLOCK_ASSASSINATE)
-        else:  # Duke
-            actions.append(Action.TAX)
-            actions.append(Action.BLOCK_FOREIGN_AID)
-        actions.append(Action.INCOME)
-        actions.append(Action.FOREIGN_AID)
-        actions.append(Action.COUP)
-        if name:
-            actions = [action.name for action in actions]
-        return actions
-
-    @staticmethod
-    def get_cards(card_names=None):
-        card_cards = [Card.AMBASSADOR, Card.ASSASSIN, Card.CAPTAIN, Card.CONTESSA, Card.DUKE]
-        cards = []
-        if card_names is None:
-            return card_cards
-        for card_name in card_names:
-            for card in card_cards:
-                if card_name == card.name:
-                    cards.append(card)
-        return cards
-
-    @staticmethod
-    def get_random_cards(num):
-        return np.random.choice(Card.get_cards(), num, replace=True)
-    @staticmethod
-    def get_card_from_action(action):
-        for card in Card.get_cards():
-            if action in card.actions():
-                return card
-
-    def __eq__(self, other):
-        if type(other) is str:
-            return self.name == other.upper()
-        else:
-            return self.name == other.name
-
-    def __str__(self):
-        return self.name
 
 
-class Action(Enum):
-    ASSASSINATE = 0
-    BLOCK_ASSASSINATE = 1
-    BLOCK_FOREIGN_AID = 2
-    BLOCK_STEAL = 3
-    EXCHANGE = 4
-    STEAL = 5
-    TAX = 6
-    INCOME = 7
-    FOREIGN_AID = 8
-    COUP = 9
-    EMPTY_ACTION = -1
-
-    def result(self):
-        """Result of actions in terms of coins gained or lost"""
-        if self.value == 5:  # Steal
-            return 2
-        elif self.value == 6:  # Tax
-            return 3
-        elif self.value == 7:  # Income
-            return 1
-        elif self.value == 8:  # Foreign Aid
-            return 2
-        elif self.value == 0:  # Assassinate
-            return -3
-        elif self.value == 9:  # Coup
-            return -7
-        else:
-            return 0
-
-    def get_block(self):
-        """ Function to retrieve corresponding block for the action if it exists else return -1"""
-        if self.value == 1:
-            return Action.BLOCK_ASSASSINATE
-        elif self.value == 2:
-            return Action.BLOCK_FOREIGN_AID
-        elif self.value == 3:
-            return Action.BLOCK_STEAL
-        else:
-            return -1
-
-    @staticmethod
-    def get_blocks(read=0):
-
-        blocks = [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.BLOCK_STEAL]
-        if read:
-            blocks = [block.name for block in blocks]
-        return blocks
-
-    @staticmethod
-    def get_action(action_name):
-        actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
-                   Action.COUP]
-        for action in actions:
-            if action.name == action_name:
-                return action
-        raise Exception('Action not found!')
-
-    @staticmethod
-    def get_actions():
-        actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
-                   Action.COUP]
-        return actions
-
-    def __str__(self):
-        return self.name
 
 
-class Player:
-    def __init__(self, cards, turn, name, player_type=0):
-        self.hidden_cards = cards
-        self.flipped_cards = []
-        self.turn = turn
-        self.coins = 0
-        self.name = name
-        self.player_type = player_type
 
-    def flip_card(self, card):
-        self.hidden_cards.remove(card)
-        self.flipped_cards.append(card)
 
-    def get_card(self, card_name):
-        for card in self.hidden_cards:
-            if card.name == card_name.upper():
-                return card
-        else:
-            raise Exception('{} does not have the unflipped card {}'.format(self.name, card_name))
+class UI:
 
-    def increase_coins(self, value):
-        self.coins = min(self.coins + value, 10)
+    def __init__(self, default_type):
+        self.default_type = default_type
 
-    def decrease_coins(self, value, set_coins=True):
-        tmp = self.coins - abs(value)
-        if tmp < 0:
-            net = tmp - abs(value)
-            tmp = 0
-        else:
-            net = abs(value)
-        if set_coins:
-            self.coins = tmp
-        return net
+    def request_input(self, s, recipient=None):
+        if self.default_type == 0:
+            return input(s)
 
-    def shuffle(self, card_names):
-        cards = []
-        if type(card_names) is str:
-            card_names = [card_names]
-
-        for card_name in card_names:
-            card = self.get_card(card_name)
-            self.hidden_cards.remove(card)
-            card, = Card.get_random_cards(1)
-            self.hidden_cards.insert(0,card)
-            cards.append(card)
-        return cards
-
-    def action_possible(self, action):
-        if self.coins == 10:
-            return action is Action.COUP
-        return self.coins + action.result() >= 0
-
-    def legal_action(self, action, discriminate=True):
-        if discriminate:
-            if self.player_type == 0:
-                return False
-        for card in self.hidden_cards:
-            if action in card.actions():
-                return True
-        return False
-
-    def __lt__(self, other):
-        return self.turn < other.turn
-
-    #  def __eq__(self, other):
-    #     return self.turn == other.turn
-
-    def __gt__(self, other):
-        return self.turn > other.turn
-
-    def __str__(self):
-        return self.name
+    def print_things(self, s, recipient=None):
+        if self.default_type == 0:
+            print(s)
 
 
 class Game:
-    def __init__(self, p1, p2, p3=None, p4=None, ui_type=0):
-        self.players = [p1, p2, p3, p4]
+    def __init__(self, players, ui_type=0):
+        self.players = players
         while None in self.players:
             self.players.remove(None)
         self.players.sort()
         self.turn = 0
         self.card_count = {}
         self.ui = UI(ui_type)
+
         for player in self.players:
             for card in player.hidden_cards:
                 if card.name in self.card_count:
@@ -274,7 +82,8 @@ class Game:
         state['Flipped Cards'] = flipped_cards
 
         return state
-
+    def next_state(self, state, action):
+        
     def possible_result_states(self, state, action, player, target=None, challenge=0, allow=0):
         if not player.action_possible(action):
             return
@@ -544,12 +353,12 @@ class Game:
             result = self.try_action(action, player, target)
 
     def ask_for_action(self, player):
-        action = raw_input('{} it is your turn. What action would you like to take? '.format(player))
+        action = input('{} it is your turn. What action would you like to take? '.format(player))
         action = action.strip().upper()
         action = Action.get_action(action)
         if action in [Action.INCOME, Action.TAX, Action.EXCHANGE, Action.FOREIGN_AID]:
             return action, None
-        target = raw_input('Who would you like to take this action against? ')
+        target = input('Who would you like to take this action against? ')
         target = target.strip()
         return action, self.get_player(target)
 
@@ -593,18 +402,18 @@ class Game:
         answer = ''
         if len(player.hidden_cards) == 2:
             if flip_reason == 1:
-                answer = raw_input(
-                    'The challenge was successful! {} which influence would you like to reveal?'.format(player.name))
+                answer = self.ui.request_input(
+                    'The challenge was successful! {} which influence would you like to reveal?'.format(player.name), player)
             elif flip_reason == 0:
-                answer = raw_input(
-                    'The challenge failed! {} which influence would you like to reveal?'.format(player.name))
+                answer = self.ui.request_input(
+                    'The challenge failed! {} which influence would you like to reveal?'.format(player.name), player)
             elif flip_reason == 2:
-                answer = raw_input(
+                answer = self.ui.request_input(
                     'One of your influences have been assassinated! {} which influence would you like to reveal?'.format
-                    (player.name))
+                    (player.name), player)
             elif flip_reason == 3:
-                answer = raw_input(
-                    'There has been a coup! {} which influence would you like to reveal?'.format(player.name))
+                answer = self.ui.request_input(
+                    'There has been a coup! {} which influence would you like to reveal?'.format(player.name), player)
 
             answer = answer.strip().upper()
             card = player.get_card(answer)
@@ -715,7 +524,6 @@ class Game:
 
 
 def test():
-    from Game import *
 
     p1 = Player([Card.AMBASSADOR, Card.DUKE], 0, 'p1')
     p2 = Player([Card.AMBASSADOR, Card.DUKE], 0, 'p2')
@@ -723,23 +531,10 @@ def test():
     # p4 = Player([Card.AMBASSADOR, Card.DUKE], 0, 'p4')
 
     game = Game(p1, p2)
-    print game.card_count
+    print(game.card_count)
     game.begin()
 
 if __name__ == '__main__':
     test()
 
-
-class UI:
-
-    def __init__(self, default_type):
-        self.default_type = default_type
-
-    def request_input(self, s, recipient=None):
-        if self.default_type == 0:
-            return raw_input(s)
-
-    def print_things(self, s, recipient=None):
-        if self.default_type == 0:
-            print(s)
 
