@@ -1,20 +1,37 @@
 from Card import Card
 from Action import Action
 
+
 class Player:
-    def __init__(self, cards, turn, name, player_type=0):
-        self.hidden_cards = cards
-        self.flipped_cards = []
+    def __init__(self, player_id, turn=0, cards=None, player_type=0):
+        self.set_cards(cards)
         self.turn = turn
         self.coins = 0
-        self.name = name
+        self.name = player_id
         self.player_type = player_type
+        #self.ai = AI(player_type)
+
+    def set_cards(self, cards):
+        if cards is None:
+            return
+        self.hidden_cards = cards
+        self.flipped_cards = []
+        self.cards = zip(cards, [False, False])
 
     def flip_card(self, card):
+        # for i, tup in enumerate(self.cards):
+        #     if tup[0] == card:
+        #         self.cards[i][1] = True
         self.hidden_cards.remove(card)
         self.flipped_cards.append(card)
 
-    def get_card(self, card_name):
+    def get_unflipped_card(self, card_name):
+        # for tup in self.cards:
+        #     card = tup[0]
+        #     if card.name == card_name.upper():
+        #         return card
+        # else:
+        #     raise Exception('{} does not have the unflipped card {}'.format(self.name, card_name))
         for card in self.hidden_cards:
             if card.name == card_name.upper():
                 return card
@@ -41,7 +58,7 @@ class Player:
             card_names = [card_names]
 
         for card_name in card_names:
-            card = self.get_card(card_name)
+            card = self.get_unflipped_card(card_name)
             self.hidden_cards.remove(card)
             card, = Card.get_random_cards(1)
             self.hidden_cards.insert(0,card)
@@ -65,8 +82,10 @@ class Player:
     def __lt__(self, other):
         return self.turn < other.turn
 
-    #  def __eq__(self, other):
-    #     return self.turn == other.turn
+    def __eq__(self, other):
+        if other is not Player:
+            return False
+        return self.name == other.name
 
     def __gt__(self, other):
         return self.turn > other.turn

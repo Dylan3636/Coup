@@ -1,4 +1,6 @@
 from enum import Enum
+
+
 class Action(Enum):
     ASSASSINATE = 0
     BLOCK_ASSASSINATE = 1
@@ -10,6 +12,11 @@ class Action(Enum):
     INCOME = 7
     FOREIGN_AID = 8
     COUP = 9
+    CHALLENGE = 10
+    FLIP_CARD_1 = 11
+    FLIP_CARD_2 = 12
+    EXCHANGE_CARD_1 = 11
+    EXCHANGE_CARD_2 = 12
     EMPTY_ACTION = -1
 
     def result(self):
@@ -39,6 +46,21 @@ class Action(Enum):
             return Action.BLOCK_STEAL
         else:
             return -1
+
+    def get_non_block(self):
+        if self == Action.BLOCK_ASSASSINATE:
+            return Action.ASSASSINATE
+        elif self == Action.BLOCK_FOREIGN_AID:
+            return Action.FOREIGN_AID
+        elif self == Action.BLOCK_STEAL:
+            return Action.STEAL
+        else:
+            return -1
+
+    def is_block(self):
+        return self in [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.STEAL]
+
+
 
     @staticmethod
     def get_blocks(read=0):

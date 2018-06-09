@@ -1,7 +1,8 @@
 import numpy as np
 from enum import Enum
 from Action import Action
-from Player import Player
+
+
 class Card(Enum):
     AMBASSADOR = 0
     ASSASSIN = 1
@@ -57,8 +58,12 @@ class Card(Enum):
         return cards
 
     @staticmethod
-    def get_random_cards(num):
-        return np.random.choice(Card.get_cards(), num, replace=True)
+    def get_random_cards(num, deck=None):
+        if deck is None:
+            return np.random.choice(Card.get_cards(), num, replace=True)
+        else:
+            return np.random.choice(deck, num, replace=False)
+
     @staticmethod
     def get_card_from_action(action):
         for card in Card.get_cards():
