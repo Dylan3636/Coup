@@ -1,6 +1,5 @@
 from enum import Enum
 
-
 class Action(Enum):
     ASSASSINATE = 0
     BLOCK_ASSASSINATE = 1
@@ -88,6 +87,7 @@ class Action(Enum):
         actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
                    Action.COUP]
         return actions
+
 
     def __str__(self):
         return self.name
