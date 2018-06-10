@@ -16,6 +16,10 @@ class StateType(Enum):
     REQUESTING_CHALLENGE = 4
     CHALLENGE_SUCCESSFUL = 5
     CHALLENGE_FAILED = 6
+    REQUESTING_CARD_FLIP = 7
+    REQUESTING_EXCHANGE = 8
+    END_OF_TURN = 9
+
 
 class Game:
     FULL_DECK = []
@@ -39,7 +43,7 @@ class Game:
             player_cards = self.draw_cards(2, deck=deck)
             player.set_cards(player_cards)
         players.sort()
-        self.state = {'Players': players, 'Turn': 0, 'Type': None, 'Pending Action': None, 'Card Choices': [], 'Finished': False, 'Winner': None, 'Deck': deck}
+        self.state = {'Players': players, 'Turn': 0, 'Type': None, 'Pending Action': None, 'Exchange Options': [], 'Finished': False, 'Winner': None, 'Deck': deck}
 
         # self.turn = 0
         # self.card_count = {}
@@ -90,27 +94,34 @@ class Game:
         deck = self.FULL_DECK
         return self.shuffle_cards(deck)
 
-    def result_of_action(self, state, action, player, target=None, successful=True):
+    def result_of_action(self, state, action, player, target=None):
         logging.debug("Checking the result of action: %s take by player %s in state: %s against target %s", str(action), str(player), str(state), str(target))
         player_id = player.turn
         target_id = None if target is None else target.turn
         cpy = state.copy()
         successful = state['Type'] == StateType.CHALLENGE_SUCCESSFUL
 
-        if action.value == -1:  # Accept pending action
+        if action is Action.EMPTY_ACTION:  # Accept pending action
             pending_action, _, _ = cpy['Pending Action']
+            logging.debug("Action accepted! Recursing into pending action: %s", pending_action)
+
             cpy = self.result_of_action(cpy, pending_action, player, target)
             cpy['Pending Action'] = None
 
-        if action.value == 10:  # Challenge
-            pending_action, _, _ = cpy['Pending Action']
+        if action is Action.CHALLENGE:  # Challenge
+            pending_action, p1, p2 = cpy['Pending Action']
             if target.legal_action(pending_action):
-                cpy = self.request_card_flip(0, player, cpy)
+                logging.debug("Challenged Failed! Recursing into pending action: %s", pending_action)
+                # cpy = self.request_card_flip(0, player, cpy)
                 cpy = self.result_of_action(cpy, pending_action, player, target)
+                cpy['Type'] = StateType.CHALLENGE_FAILED
+                cpy['Pending Action'] = (None, p1, p2)
             else:
-                cpy = self.request_card_flip(1, target, cpy)
+                logging.debug("Challenge successful!")
+                cpy['Type'] = StateType.CHALLENGE_SUCCESSFUL
+                # cpy = self.request_card_flip(1, target, cpy)
+
             # TODO if challengee won challenge then their revealed card needs to be replaced
-            cpy['Pending Action'] = None
 
         if 16 < action.value < 19: # Flipping cards after challenge
             card = cpy['Players'][player_id].hidden_cards[action.value-17]
@@ -124,7 +135,8 @@ class Game:
             cpy = state.copy()
             if player.action_possible(action):
                 cpy['Players'][player_id].decrease_coins(7)
-                cpy = self.request_card_flip(2, target, cpy)
+                cpy['Type'] = StateType.REQUESTING_CARD_FLIP
+                #cpy = self.request_card_flip(target, cpy)
 
         elif action.value == 5:  # Steal
             if successful:
@@ -142,12 +154,13 @@ class Game:
         elif action.value == 0:  # Assassinate
             cpy['Players'][player_id].decrease_coins(3)
             if successful:
-                cpy = self.request_card_flip(2, target, state)
+                cpy['Type'] = StateType.REQUESTING_CARD_FLIP
+
 
         elif action.value == 4:  # Exchange
             if successful:
-                card_choices = player.hidden_cards + self.draw_cards(2)
-                cpy['Card Choices'] = card_choices
+                card_choices = player.hidden_cards + self.draw_cards(2, deck=cpy['Deck'])
+                cpy['Exchange Options'] = card_choices
 
                 #cpy = self.request_exchange(player, state)
 
@@ -183,7 +196,6 @@ class Game:
             deck = self.return_cards(deck, card_choices)
             cpy['Deck'] = deck
 
-
         elif action.is_block():  # Block Actions
             if not successful:
                 return self.result_of_action(cpy, action.get_non_block(), target, player, successful=True)
@@ -194,14 +206,17 @@ class Game:
         debugstr = 'Initiating transition from from State: {} using Action: {} played by player {}'.format(state, action, player)
         debugstr += '' if target is None else 'with target {}'.format(target)
         logging.debug(debugstr)
-        if not player.action_possible(action):
-            logging.debug('Action %s could not be taken by player %s', action, player)
-            return
-        player_id = player.turn
-        target_id = None if target is None else target.turn
         cpy = state.copy()
 
+        if not player.action_possible(action):
+            logging.critical('Action %s could not be taken by player %s', action, player)
+            return
+
+        player_id = player.turn
+        target_id = None if target is None else target.turn
+
         if action in [Action.EMPTY_ACTION, Action.INCOME, Action.COUP, Action.CHALLENGE] and action.value >= 11:
+            # These actions cannot be blocked or challenged
             cpy = self.result_of_action(cpy, action, player, target)
         else:
             logging.debug("Action %s is now pending", action)
@@ -500,6 +515,8 @@ class Game:
 
     def run_turn(self, state):
         ns = self.start_turn(state)
+        while ns['Type'] is not StateType.END_OF_TURN:
+            ns = self.continue_turn(ns)
         ns = self.end_turn(ns)
         return ns
 
@@ -518,47 +535,61 @@ class Game:
         if next_state['Pending Action'] is None:
             logging.debug('%s could not be blocked or challenged, so moving on', action)
             # The action can not be blocked or challenged
+            next_state['Type'] = StateType.END_OF_TURN
             return next_state
         else:
             # Query all players to see if they want to challenge
-            challenger = self.request_challenge(player, next_state)
+            response_action, responder = self.request_block_or_challenge(player, next_state)
+
+            if action is Action.EMPTY_ACTION:
+                # The action was not challenged or blocked
+                logging.debug('%s was not blocked or challenged', response_action)
+                next_state = self.next_state(next_state, action, target, None)
+                next_state['Type'] = StateType.END_OF_TURN
+
+            elif action.is_block():
+                # Action was blocked
+                logging.debug('%s was blocked by %s', action, responder)
+                next_state = self.next_state(next_state, response_action, responder, player)
+                next_state['Type'] = StateType.BLOCKING
+
+            elif response_action is Action.CHALLENGE:
+                # The action was challenged
+                logging.debug('%s was challenged by %s', action, responder)
+                next_state = self.next_state(next_state, response_action, responder, player)
+                next_state['Type'] = StateType.END_OF_TURN
+
+        return next_state
+
+    def continue_turn(self, state):
+        state = state.copy()
+        player = state['Players'][state['Turn']]
+        logging.info("Continuing player %s's turn", player)
+
+        pending_action, player_id, target_id = state['Pending Action']
+        player = state['Players'][player_id]
+        target = None if target_id is None else state['Players'][target_id]
+
+        if state['Type'] is StateType.BLOCKING:
+            challenger = self.request_challenge(player, state)
 
             if challenger is None:
-                # The action was not challenged
-                logging.debug('%s was not challenged', action)
-                pending_action, player_id, target_id = next_state['Pending Action']
-                player = next_state['Players'][player_id]
-                target = None if target_id is None else next_state['Players'][target_id]
-
-                # Ask targeted player if they want to Block or Accept
-                action = self.request_block(target, next_state)
-                next_state = self.next_state(next_state, action, target, player)
-
-                if next_state['Pending Action'] is None:
-                    # The action was not blocked
-                    logging.debug('%s was not blocked', action)
-
-                    next_state = self.next_state(next_state, Action.EMPTY_ACTION, player, target)
-                else:
-                    # Action was blocked
-                    logging.debug('%s was blocked', action)
-
-                    # Query all players to see if they want to challenge the block action
-                    challenger = self.request_challenge(target, next_state)
-
-                    if challenger is None:
-                        # Blocking action was not challenged
-                        logging.debug('%s was not challenged', action)
-                        next_state = self.next_state(next_state, Action.EMPTY_ACTION, player, target)
-                    else:
-                        # Blocking action was challenged
-                        logging.debug('%s was challenged by %s', action, challenger)
-                        next_state = self.next_state(next_state, Action.CHALLENGE, challenger, target)
+                # Blocking action was not challenged
+                logging.debug('%s was not challenged', pending_action)
+                next_state = self.next_state(state, Action.EMPTY_ACTION, player, target)
             else:
-                # The action was challenged
-                logging.debug('%s was challenged by %s', action, challenger)
-                next_state = self.next_state(next_state, Action.CHALLENGE, challenger, player)
-        return next_state
+                # Blocking action was challenged
+                logging.debug('%s was challenged by %s', pending_action, challenger)
+                next_state = self.next_state(state, Action.CHALLENGE, challenger, target)
+
+            next_state['Type'] = StateType.END_OF_TURN
+            return next_state
+        if state['Type'] is StateType.CHALLENGE_SUCCESSFUL:
+            _, player, target = pending_action
+            next_state = self.request_card_flip(player, state)
+        elif state['Type'] is StateType.CHALLENGE_FAILED:
+            _, player, target = pending_action
+            next_state = self.request_card_flip(target, state)
 
     def end_turn(self, state):
         p = state['Players'][state['Turn']]
@@ -608,13 +639,15 @@ class Game:
         state['Players'][player_id].set_cards(cards)
         return state
 
-    def request_card_flip(self, flip_reason, player, state):
+    def request_card_flip(self, player, state):
         logging.info("Requesting card flip from %s...", player)
         logging.debug("Current available cards %s", player.hidden_cards)
-        card = player.request_card_flip(state)
-        self.flip_player_card(player, card, state)
-        state['Players'][player.turn] = player
-        return state
+        action = player.request_card_flip(state)
+        return self.result_of_action(state, action, player)
+
+        # self.flip_player_card(player, card, state)
+        # state['Players'][player.turn] = player
+        # return state
 
     def request_exchange(self, player, state):
         cards = self.draw_cards(1)
