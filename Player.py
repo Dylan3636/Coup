@@ -11,6 +11,73 @@ class Player:
         self.player_type = player_type
         #self.ai = AI(player_type)
 
+    def request_action(self, state):
+        if self.player_type == 1:
+            action, target = self.request_action(state)
+        else:
+            action = self.ui.request_action('{} it is your turn. What action would you like to take? '.format(self),
+                                            self)
+            if action in [Action.INCOME, Action.TAX, Action.EXCHANGE, Action.FOREIGN_AID]:
+                return action, None
+            target = self.ui.request_input('Who would you like to take this action against? ', self)
+            target = target.strip()
+            target = self.get_player(target, self)
+        return action, target
+
+    def request_challenge(self, state):
+            if player is p1:
+                continue
+            if player.player_type == 1:
+                action = player.request_challenge(state)
+            else:
+                action = self.ui.request_challenge(player, state)  # CHALLENGE or EMPTY_ACTION/ACCEPT
+            if action is Action.CHALLENGE:
+                logging.debug('%s has challenged action', player)
+                return player
+            else:
+                logging.debug('%s has chosen not to challenge action', player)
+        return None
+
+    def request_card_flip(self, state, flip_reason):
+        if len(self.hidden_cards) == 2:
+            card = None
+            if self.player_type == 1:
+                card = self.request_card_flip(state)
+            else:
+                if flip_reason == 1:
+                    card = self.ui.request_card(
+                        'The challenge was successful! {} which influence would you like to reveal?'.format(self.name)
+                        , self)
+                elif flip_reason == 0:
+                    card = self.ui.request_card(
+                        'The challenge failed! {} which influence would you like to reveal?'.format(self.name)
+                        , self)
+                elif flip_reason == 2:
+                    card = self.ui.request_card(
+                        'One of your influences have been assassinated! {} which influence would you like to reveal?'
+                        .format(self.name), self)
+                elif flip_reason == 3:
+                    card = self.ui.request_card(
+                        'There has been a coup! {} which influence would you like to reveal?'.format(self.name)
+                        , self)
+
+        else:
+
+            if flip_reason == 1:
+                self.ui.print_things(
+                    'The challenge was successful!'.format(self.name))
+            elif flip_reason == 0:
+                self.ui.print_things(
+                    'The challenge failed!'.format(self.name))
+            elif flip_reason == 2:
+                self.ui.print_things(
+                    'One of your influences have been assassinated!'.format
+                    (self.name))
+            elif flip_reason == 3:
+                self.ui.print_things(
+                    'There has been a coup!'.format(self.name))
+            card = self.hidden_cards[0]
+
     def set_cards(self, cards):
         if cards is None:
             return

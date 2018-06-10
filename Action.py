@@ -13,10 +13,14 @@ class Action(Enum):
     FOREIGN_AID = 8
     COUP = 9
     CHALLENGE = 10
-    FLIP_CARD_1 = 11
-    FLIP_CARD_2 = 12
-    EXCHANGE_CARD_1 = 11
-    EXCHANGE_CARD_2 = 12
+    CHOOSE_CARDS_1_AND_2 = 11
+    CHOOSE_CARDS_1_AND_3 = 12
+    CHOOSE_CARDS_1_AND_4 = 13
+    CHOOSE_CARDS_2_AND_3 = 14
+    CHOOSE_CARDS_2_AND_4 = 15
+    CHOOSE_CARDS_3_AND_4 = 16
+    FLIP_CARD_1 = 17
+    FLIP_CARD_2 = 18
     EMPTY_ACTION = -1
 
     def result(self):
