@@ -98,7 +98,7 @@ class Game:
 
         if action is Action.CHALLENGE:  # Challenge
             pending_action, p1, p2 = cpy['Pending Action']
-            if target.legal_action(pending_action):
+            if not target.bluffing(pending_action):
                 logging.debug("Challenged Failed! Recursing into pending action: %s", pending_action)
                 cpy['Type'] = StateType.SUCCESSFUL_ACTION
                 cpy = self.result_of_action(cpy, pending_action, player, target)
@@ -149,10 +149,20 @@ class Game:
                 cpy['Exchange Options'] = card_choices
                 cpy['Type'] = StateType.REQUESTING_EXCHANGE
 
-        elif 10 < action.value < 17: # Choosing cards to keep after exchange
+        elif 10 < action.value < 20: # Choosing cards to keep after exchange
             deck = cpy['Deck']
             card_choices = cpy['Exchange Options']
             new_cards = []
+
+            if action is Action.CHOOSE_CARD_1:
+                new_cards += card_choices.pop(0)
+
+            if action is Action.CHOOSE_CARD_2:
+                new_cards += card_choices.pop(1)
+
+            if action is Action.CHOOSE_CARD_3:
+                new_cards += card_choices.pop(2)
+
             if action is Action.CHOOSE_CARDS_1_AND_2:
                 new_cards += card_choices.pop(0)
                 new_cards += card_choices.pop(0)
@@ -570,12 +580,6 @@ class Game:
             for p in state['Players']:
                 if p.player_type == 1:
                     action, _ = player.request_action(state)
-                else:
-                    action = self.ui.request_action(
-                        '{} it is your turn. What action would you like to take? '.format(p),
-                        p)
-                if action.is_block():
-                    return action, None
         action, target = player.request_action(state)
         return action, target
 
@@ -620,17 +624,13 @@ class Game:
         action = player.request_card_flip(state)
         return self.result_of_action(state, action, player)
 
-    def request_exchange(self, player, state):
-        cards = self.draw_cards(1)
-        choices = player.hidden_cards
-        choices = np.append(choices, cards).tolist()
-        if player.type == 1:
-            cards = player.request_exchange(choices, state)
-        else:
-            cards = self.ui.request_card('{} these are your choices {}. Which would you like to keep?'.format(
-                player.name, choices), player)
-        state['Players'][player.name].set_cards(Card.get_cards(cards))
-        return state
+    # def request_exchange(self, player, state):
+    #     cards = self.draw_cards(1)
+    #     choices = player.hidden_cards
+    #     choices = np.append(choices, cards).tolist()
+    #     action = player.request_exchange(choices, state)
+    #     state['Players'][player.name].set_cards(Card.get_cards(cards))
+    #     return state
 
 
     def new_deck(self):
@@ -730,7 +730,8 @@ class Game:
                 return player
         raise Exception('Player not found!')
 
-    def remove_player(self, player, state):
+    @staticmethod
+    def remove_player(player, state):
         logging.info("Player {} has shown all their influence and has lost.".format(player.name), player)
         state['Players'].remove(player)
 

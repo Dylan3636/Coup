@@ -5,6 +5,8 @@ class Action(Enum):
     BLOCK_ASSASSINATE = 1
     BLOCK_FOREIGN_AID = 2
     BLOCK_STEAL = 3
+    BLOCK_STEAL_AMBASSADOR = 3
+    BLOCK_STEAL_CAPTAIN = 4
     EXCHANGE = 4
     STEAL = 5
     TAX = 6
@@ -12,14 +14,17 @@ class Action(Enum):
     FOREIGN_AID = 8
     COUP = 9
     CHALLENGE = 10
-    CHOOSE_CARDS_1_AND_2 = 11
-    CHOOSE_CARDS_1_AND_3 = 12
-    CHOOSE_CARDS_1_AND_4 = 13
-    CHOOSE_CARDS_2_AND_3 = 14
-    CHOOSE_CARDS_2_AND_4 = 15
-    CHOOSE_CARDS_3_AND_4 = 16
-    FLIP_CARD_1 = 17
-    FLIP_CARD_2 = 18
+    CHOOSE_CARD_1 = 11
+    CHOOSE_CARD_2 = 12
+    CHOOSE_CARD_3 = 13
+    CHOOSE_CARDS_1_AND_2 = 14
+    CHOOSE_CARDS_1_AND_3 = 15
+    CHOOSE_CARDS_1_AND_4 = 16
+    CHOOSE_CARDS_2_AND_3 = 17
+    CHOOSE_CARDS_2_AND_4 = 18
+    CHOOSE_CARDS_3_AND_4 = 19
+    FLIP_CARD_1 = 20
+    FLIP_CARD_2 = 21
     EMPTY_ACTION = -1
 
     def result(self):
@@ -46,7 +51,7 @@ class Action(Enum):
         elif self.value == 2:
             return Action.BLOCK_FOREIGN_AID
         elif self.value == 3:
-            return Action.BLOCK_STEAL
+            return [Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
         else:
             return -1
 
@@ -55,7 +60,7 @@ class Action(Enum):
             return Action.ASSASSINATE
         elif self == Action.BLOCK_FOREIGN_AID:
             return Action.FOREIGN_AID
-        elif self == Action.BLOCK_STEAL:
+        elif self in [Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]:
             return Action.STEAL
         else:
             return -1
@@ -68,7 +73,7 @@ class Action(Enum):
     @staticmethod
     def get_blocks(read=0):
 
-        blocks = [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.BLOCK_STEAL]
+        blocks = [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
         if read:
             blocks = [block.name for block in blocks]
         return blocks

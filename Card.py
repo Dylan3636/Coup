@@ -26,13 +26,12 @@ class Card(Enum):
         actions = []
         if self.value == 0:  # Ambassador
             actions.append(Action.EXCHANGE)
-            actions.append(Action.BLOCK_STEAL)
+            actions.append(Action.BLOCK_STEAL_AMBASSADOR)
         elif self.value == 1:  # Assassin
             actions.append(Action.ASSASSINATE)
-            actions.append(Action.BLOCK_STEAL)
         elif self.value == 2:  # Captain
             actions.append(Action.STEAL)
-            actions.append(Action.BLOCK_STEAL)
+            actions.append(Action.BLOCK_STEAL_CAPTAIN)
         elif self.value == 3:  # Contessa
             actions.append(Action.BLOCK_ASSASSINATE)
         else:  # Duke
