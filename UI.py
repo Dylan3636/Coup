@@ -1,6 +1,6 @@
 import re
 from Action import Action
-from Game import Game
+
 
 class UI:
     def __init__(self, default_type=0):
@@ -17,7 +17,7 @@ class UI:
     def request_card_flip(self, player):
         num_hiddens = len(player.hidden_cards)
         if num_hiddens == 1:
-            return Action.FLIP_CARD_1S
+            return Action.FLIP_CARD_1
         else:
             answer = self.request_input('Please choose influence to reveal ({}/0 or {}/1)'.format(player.hidden_cards[0], player.hidden_cards[1]), player)
             answer = answer.strip().lower()
@@ -109,7 +109,7 @@ class UI:
             target = self.request_input('Who would you like to take this action against? ', self)
             target = target.strip()
             try:
-                target = Game.get_player(state, target)
+                target = self.get_player(state, target)
                 return target
             except:
                 self.typo_check(target, player)
@@ -181,3 +181,10 @@ class UI:
 
     def typo_check(self, answer, player):
         self.print_things('I believe {} was a typo. Try again.'.format(answer), player)
+
+    @staticmethod
+    def get_player(player_name, state):
+        for player in state['Players']:
+            if player.name == player_name:
+                return player
+        raise Exception('Player not found!')

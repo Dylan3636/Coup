@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.idea" />
     </content>
     <content url="file://$MODULE_DIR$/../Machine_Learning" />
-    <orderEntry type="jdk" jdkName="Python 3.5.3 (C:\ProgramData\Anaconda2\envs\tensorflow\python.exe)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 2.7.15 (C:\Users\dylan\AppData\Local\conda\conda\envs\coup\python.exe)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

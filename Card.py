@@ -44,15 +44,29 @@ class Card(Enum):
             actions = [action.name for action in actions]
         return actions
 
+    def get_block(self):
+        if self is Card.CONTESSA:
+            return Action.BLOCK_ASSASSINATE
+        if self is Card.DUKE:
+            return Action.BLOCK_FOREIGN_AID
+        if self is Card.CAPTAIN:
+            return Action.BLOCK_STEAL_CAPTAIN
+        if self is Card.AMBASSADOR:
+            return Action.BLOCK_STEAL_AMBASSADOR
+
     @staticmethod
     def get_cards(card_names=None):
         card_list = [Card.AMBASSADOR, Card.ASSASSIN, Card.CAPTAIN, Card.CONTESSA, Card.DUKE]
         cards = []
         if card_names is None:
             return card_list
+        if isinstance(card_names,str):
+            for card in card_list:
+                if card_names.upper() == card.name:
+                    return card
         for card_name in card_names:
             for card in card_list:
-                if card_name == card.name:
+                if card_name.upper() == card.name:
                     cards.append(card)
         return cards
 

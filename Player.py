@@ -1,7 +1,8 @@
+#from Game import Action, Card, Game
 from Card import Card
 from Action import Action
 from UI import UI
-from Game import StateType
+from State import StateType
 
 
 class Player:
@@ -25,6 +26,7 @@ class Player:
         self.flipped_cards = []
 
     def flip_card(self, card):
+        self.hidden_cards = list(self.hidden_cards)
         self.hidden_cards.remove(card)
         self.flipped_cards.append(card)
 
@@ -63,6 +65,8 @@ class Player:
         return cards
 
     def action_possible(self, action):
+        if action not in [Action.ASSASSINATE, Action.COUP]:
+            return True
         if self.coins == 10:
             return action is Action.COUP
         return self.coins + action.result() >= 0
@@ -100,7 +104,8 @@ class Player:
                 ]
 
         elif state_type is StateType.REQUESTING_BLOCK:
-            options = Action.get_blocks() + [Action.CHALLENGE, Action.EMPTY_ACTION]
+            action, _, _ = state['Pending Action']
+            options = action.get_block() + [Action.CHALLENGE, Action.EMPTY_ACTION]
 
         elif state_type is StateType.REQUESTING_CHALLENGE:
             options = [Action.CHALLENGE, Action.EMPTY_ACTION]
@@ -117,13 +122,21 @@ class Player:
                 return True
         return False
 
+
     def __lt__(self, other):
         return self.turn < other.turn
 
     def __eq__(self, other):
-        if other is not Player:
+        if not isinstance(other, Player):
             return False
         return self.name == other.name
+
+    def __copy__(self):
+        copied_player = Player(self.name, self.turn, None, self.ui)
+        copied_player.hidden_cards = self.hidden_cards[:]
+        copied_player.flipped_cards = self.flipped_cards[:]
+        copied_player.coins = self.coins
+        return copied_player
 
     def __gt__(self, other):
         return self.turn > other.turn

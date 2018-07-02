@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Action(Enum):
     ASSASSINATE = 0
     BLOCK_ASSASSINATE = 1
@@ -47,13 +48,14 @@ class Action(Enum):
     def get_block(self):
         """ Function to retrieve corresponding block for the action if it exists else return -1"""
         if self.value == 1:
-            return Action.BLOCK_ASSASSINATE
+            return [Action.BLOCK_ASSASSINATE]
         elif self.value == 2:
-            return Action.BLOCK_FOREIGN_AID
+            return [Action.BLOCK_FOREIGN_AID]
         elif self.value == 3:
             return [Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
         else:
-            return -1
+            return []
+
 
     def get_non_block(self):
         if self == Action.BLOCK_ASSASSINATE:
@@ -66,7 +68,7 @@ class Action(Enum):
             return -1
 
     def is_block(self):
-        return self in [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.STEAL]
+        return self in [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.STEAL, Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
 
 
 
@@ -80,6 +82,7 @@ class Action(Enum):
 
     @staticmethod
     def get_action(action_name):
+        action_name = action_name.upper().replace('-','_')
         actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
                    Action.COUP]
         for action in actions:
@@ -96,3 +99,6 @@ class Action(Enum):
 
     def __str__(self):
         return self.name
+
+    def __lt__(self, other):
+        return self.value < other.value
