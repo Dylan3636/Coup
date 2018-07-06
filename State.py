@@ -12,3 +12,4 @@ class StateType(Enum):
     REQUESTING_CARD_FLIP = 7
     REQUESTING_EXCHANGE = 8
     END_OF_TURN = 9
+
