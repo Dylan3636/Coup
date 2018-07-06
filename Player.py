@@ -1,4 +1,3 @@
-#from Game import Action, Card, Game
 from Card import Card
 from Action import Action
 from UI import UI
@@ -111,7 +110,10 @@ class Player:
             options = [Action.CHALLENGE, Action.EMPTY_ACTION]
 
         elif state_type is StateType.REQUESTING_CARD_FLIP:
-            options = [Action.FLIP_CARD_1, Action.FLIP_CARD_2]
+            if len(self.hidden_cards) > 1:
+                options = [Action.FLIP_CARD_1, Action.FLIP_CARD_2]
+            else:
+                options = [Action.FLIP_CARD_1]
 
         options.sort()
         return options, target
