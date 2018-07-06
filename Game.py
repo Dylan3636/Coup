@@ -19,7 +19,7 @@ class Game:
     for card in Card.get_cards():
         FULL_DECK += [card, card, card]
 
-    def __init__(self, players, LOGLEVEL=logging.INFO):
+    def __init__(self, players, LOGLEVEL=logging.DEBUG):
         logging.basicConfig(format='%(levelname)s: %(message)s', level=LOGLEVEL)
         logging.info("Making new game with players " + str(list(map(str, players))))
         deck = self.new_deck()
@@ -58,7 +58,7 @@ class Game:
         return self.run_game(ns, step, lookahead)
 
     def result_of_action(self, state, action, player, target=None):
-        logging.debug("Checking the result of action: %s take by player %s in state: %s against target %s", str(action), str(player), str(state), str(target))
+        logging.debug("Checking the result of action: %s take by player %s in state: %s against target %s", str(action), str(player), Game.print_state(state), str(target))
         player_id = player.turn
         target_id = None if target is None else target.turn
         cpy = state.copy()
@@ -79,18 +79,17 @@ class Game:
             if not p1.bluffing(pending_action):
                 logging.info("Challenged Failed!")
                 logging.debug("Recursing into pending action: %s", pending_action)
-                cpy['Type'] = StateType.SUCCESSFUL_ACTION
-                cpy = self.result_of_action(cpy, pending_action, p1, p2)
                 cpy['Type'] = StateType.CHALLENGE_FAILED
                 cpy['Pending Action'] = (None, player.turn, p1.turn)
+                cpy = self.result_of_action(cpy, pending_action, p1, p2)
+                cpy['Type'] = StateType.SUCCESSFUL_ACTION
+                return self.result_of_action(cpy, pending_action, p1, p2)
                 # TODO if challengee won challenge then their revealed card needs to be replaced
 
             else:
                 logging.info("Challenge successful!")
                 cpy['Type'] = StateType.CHALLENGE_SUCCESSFUL
                 cpy['Pending Action'] = (None, player.turn, p1.turn)
-
-
 
         elif action.value == 7:  # Income
             cpy = state.copy()
@@ -99,27 +98,35 @@ class Game:
 
         elif action.value == 9:  # Coup
             cpy = state.copy()
-            if player.action_possible(action):
-                cpy['Players'][player_id].decrease_coins(7)
-                cpy['Type'] = StateType.REQUESTING_CARD_FLIP
+            cpy['Players'][player_id].decrease_coins(7)
+            cpy['Type'] = StateType.REQUESTING_CARD_FLIP
+            cpy['Pending Action'] = Action.COUP, player_id, target_id
 
         elif action.value == 5:  # Steal
             if successful:
                 net = cpy['Players'][target_id].decrease_coins(2)
                 cpy['Players'][player_id].increase_coins(net)
+            cpy['Type'] = StateType.END_OF_TURN
+
 
         elif action.value == 6:  # Tax
             if successful:
                 cpy['Players'][player_id].increase_coins(3)
+                cpy['Type'] = StateType.END_OF_TURN
+
 
         elif action.value == 8:  # Foreign Aid
             if successful:
                 cpy['Players'][player_id].increase_coins(3)
+                cpy['Type'] = StateType.END_OF_TURN
+
 
         elif action.value == 0:  # Assassinate
             cpy['Players'][player_id].decrease_coins(3)
             if successful:
                 cpy['Type'] = StateType.REQUESTING_CARD_FLIP
+            else:
+                cpy['Type'] = StateType.END_OF_TURN
 
         elif action.value == 4:  # Exchange
             if successful:
@@ -133,45 +140,47 @@ class Game:
             new_cards = []
 
             if action is Action.CHOOSE_CARD_1:
-                new_cards += card_choices.pop(0)
+                new_cards.append(card_choices.pop(0))
 
-            if action is Action.CHOOSE_CARD_2:
-                new_cards += card_choices.pop(1)
+            elif action is Action.CHOOSE_CARD_2:
+                new_cards.append(card_choices.pop(1))
 
-            if action is Action.CHOOSE_CARD_3:
-                new_cards += card_choices.pop(2)
+            elif action is Action.CHOOSE_CARD_3:
+                new_cards.append(card_choices.pop(2))
 
-            if action is Action.CHOOSE_CARDS_1_AND_2:
-                new_cards += card_choices.pop(0)
-                new_cards += card_choices.pop(0)
+            elif action is Action.CHOOSE_CARDS_1_AND_2:
+                new_cards.append(card_choices.pop(0))
+                new_cards.append(card_choices.pop(0))
 
             elif action is Action.CHOOSE_CARDS_1_AND_3:
-                new_cards += card_choices.pop(0)
-                new_cards += card_choices.pop(1)
+                new_cards.append(card_choices.pop(0))
+                new_cards.append(card_choices.pop(1))
 
             elif action is Action.CHOOSE_CARDS_1_AND_4:
 
-                new_cards += card_choices.pop(0)
-                new_cards += card_choices.pop(2)
+                new_cards.append(card_choices.pop(0))
+                new_cards.append(card_choices.pop(2))
 
             elif action is Action.CHOOSE_CARDS_2_AND_3:
-                new_cards += card_choices.pop(1)
-                new_cards += card_choices.pop(1)
+                new_cards.append(card_choices.pop(1))
+                new_cards.append(card_choices.pop(1))
 
             elif action is Action.CHOOSE_CARDS_2_AND_4:
-                new_cards += card_choices.pop(1)
-                new_cards += card_choices.pop(2)
+                new_cards.append(card_choices.pop(1))
+                new_cards.append(card_choices.pop(2))
 
             elif action is Action.CHOOSE_CARDS_3_AND_4:
-                new_cards += card_choices.pop(2)
-                new_cards += card_choices.pop(2)
+                new_cards.append(card_choices.pop(2))
+                new_cards.append(card_choices.pop(2))
             cpy = self.set_player_cards(cpy, player_id, new_cards)
             deck = self.return_cards(deck, card_choices)
             cpy['Deck'] = deck
             cpy['Exchange Options'] = None
+            cpy['Type'] = StateType.END_OF_TURN
 
-        elif 20 < action.value < 22:  # Flipping cards after challenge
-            card = cpy['Players'][player_id].hidden_cards[action.value - 21]
+
+        elif 19 < action.value < 22:  # Flipping cards after challenge
+            card = cpy['Players'][player_id].hidden_cards[action.value - 20]
             cpy = self.flip_player_card(player, card, cpy)
             cpy['Type'] = StateType.END_OF_TURN
 
@@ -182,14 +191,15 @@ class Game:
                 return self.result_of_action(cpy, action.get_non_block(), target, player)
             else:
                 logging.info("player %s successfully blocked player %s action %s", player, target, action.get_non_block())
+                cpy['Type'] = StateType.END_OF_TURN
 
-        logging.debug("Resulting state: %s", cpy)
+        logging.debug("Resulting state: %s", Game.print_state(cpy))
         return cpy
 
     def next_state(self, state, action, player, target=None):
         # if state['Type'] != StateType.START_OF_TURN:
         #     logging.critical('State type should be START_OF_TURN but found %s', state['Type'])
-        debugstr = 'Initiating transition from from State: {} using Action: {} played by player {}'.format(state, action, player)
+        debugstr = 'Initiating transition from from State: {} using Action: {} played by player {}'.format(Game.print_state(state), action, player)
         debugstr += '' if target is None else 'with target {}'.format(target)
         logging.debug(debugstr)
         cpy = state.copy()
@@ -257,6 +267,7 @@ class Game:
             if response_action is Action.EMPTY_ACTION:
                 # The action was not challenged or blocked
                 logging.info('%s was not blocked or challenged', action)
+                state['Type'] = StateType.SUCCESSFUL_ACTION
                 next_state = self.result_of_action(state, action, player, target)
                 return next_state
                 #next_state['Type'] = StateType.END_OF_TURN
@@ -311,7 +322,7 @@ class Game:
             next_state['Type'] = StateType.END_OF_TURN
 
         elif state['Type'] is StateType.REQUESTING_EXCHANGE:
-            _, _, player_id = state['Pending Action']
+            _, player_id, _ = state['Pending Action']
             player = state['Players'][player_id]
             next_state = self.request_exchange(player, state)
             next_state['Type'] = StateType.END_OF_TURN
@@ -329,10 +340,11 @@ class Game:
             return state
         try:
             p = state['Players'][state['Turn']]
-            logging.info("Ending player %s's turn", p)
+            logging.info("Ending player %s's turn\n", p)
         except IndexError:
             logging.debug('The player whose turn it was already kicked from the game')
         state['Turn'] = (state['Turn'] + 1) % len(state['Players'])
+        state['Pending Action'] = None
 
         return state
 
@@ -395,11 +407,13 @@ class Game:
         logging.debug("Current available cards %s", player.hidden_cards)
         state['Type'] = StateType.REQUESTING_CARD_FLIP
         action,_ = player.request_action(state)
+        logging.info("Player %s chose action %s", player, action)
         return self.result_of_action(state, action, player)
 
     def request_exchange(self, player, state):
         state['Type'] = StateType.REQUESTING_EXCHANGE
         action, _ = player.request_action(state)
+        logging.info("Player %s chose action %s", player, action)
         return self.result_of_action(state, action, player)
 
     @staticmethod
@@ -532,8 +546,17 @@ class Game:
             players.append(p)
         return players, deck
 
-
-
+    @staticmethod
+    def print_state(state):
+        s = 'Turn: {} Type: {} Pending Action: {} \nDeck: {} \nExchange Options: {} \nFinished: {} Winner: {}\n'.format(
+            state['Turn'], state['Type'], state['Pending Action'], state['Deck'],
+            state['Exchange Options'], state['Finished'], state['Winner']
+        )
+        for player in state['Players']:
+            s += ('Player: {} Coins: {} Turn: {} Hidden Cards: {} Revealed Cards: {}\n'.format(
+                player.name, player.coins, player.turn, player.hidden_cards, player.flipped_cards
+            ))
+        return s
 
 
 def test():
@@ -541,8 +564,12 @@ def test():
     p1 = RandomAI('p1')# Player('p1', cards=[Card.AMBASSADOR, Card.DUKE])
     p2 = RandomAI('p2')# Player('p2', cards=[Card.AMBASSADOR, Card.DUKE])
     p3 = RandomAI('p3')# p3 = Player([Card.AMBASSADOR, Card.DUKE], 0, 'p3')
+    p4 = RandomAI('p4')
+    p5 = RandomAI('p5')
+    p6 = RandomAI('p6')
+
     # p4 = Player([Card.AMBASSADOR, Card.DUKE], 0, 'p4')
-    game = Game([p1, p2, p3])
+    game = Game([p1, p2, p3, p4, p5, p6])
     game.start_game()
 
 if __name__ == '__main__':
