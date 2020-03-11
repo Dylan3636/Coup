@@ -56,7 +56,6 @@ class Action(Enum):
         else:
             return []
 
-
     def get_non_block(self):
         if self == Action.BLOCK_ASSASSINATE:
             return Action.ASSASSINATE
@@ -70,19 +69,24 @@ class Action(Enum):
     def is_block(self):
         return self in [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.STEAL, Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
 
+    def is_flipping_action(self):
+        return self in [Action.FLIP_CARD_1, Action.FLIP_CARD_2]
 
+    def is_choosing_action(self):
+        return 10 < self.value < 20
 
     @staticmethod
     def get_blocks(read=0):
 
-        blocks = [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID, Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
+        blocks = [Action.BLOCK_ASSASSINATE, Action.BLOCK_FOREIGN_AID,
+                  Action.BLOCK_STEAL_AMBASSADOR, Action.BLOCK_STEAL_CAPTAIN]
         if read:
             blocks = [block.name for block in blocks]
         return blocks
 
     @staticmethod
     def get_action(action_name):
-        action_name = action_name.upper().replace('-','_')
+        action_name = action_name.upper().replace('-', '_')
         actions = [Action.ASSASSINATE, Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID,
                    Action.COUP]
         for action in actions:
@@ -96,6 +100,9 @@ class Action(Enum):
                    Action.COUP]
         return actions
 
+    @staticmethod
+    def get_all_actions():
+        return Action.get_actions() + Action.get_blocks()
 
     def __str__(self):
         return self.name
