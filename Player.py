@@ -66,7 +66,7 @@ class Player:
     def action_possible(self, action):
         if action not in [Action.ASSASSINATE, Action.COUP]:
             return True
-        if self.coins == 10:
+        if self.coins > 9:
             return action is Action.COUP
         return self.coins + action.result() >= 0
 
@@ -75,13 +75,14 @@ class Player:
         options = []
         target = False
         if state_type is StateType.START_OF_TURN:
-            options = [Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID]
-            if self.coins >= 3:
-                options.append(Action.ASSASSINATE)
-            if self.coins >= 7:
-                options.append(Action.COUP)
-            if self.coins == 10:
+            if self.coins >= 9:
                 options = [Action.COUP]
+            else:
+                options = [Action.EXCHANGE, Action.STEAL, Action.TAX, Action.INCOME, Action.FOREIGN_AID]
+                if self.coins >= 3:
+                    options.append(Action.ASSASSINATE)
+                if self.coins >= 7:
+                    options.append(Action.COUP)
             target = True
 
         elif state_type is StateType.REQUESTING_EXCHANGE:
@@ -95,12 +96,14 @@ class Player:
                     Action.CHOOSE_CARDS_2_AND_4,
                     Action.CHOOSE_CARDS_3_AND_4
                 ]
-            else:
+            elif len(exchange_options)==3:
                 options = [
                     Action.CHOOSE_CARD_1,
                     Action.CHOOSE_CARD_2,
                     Action.CHOOSE_CARD_3,
                 ]
+            else:
+                raise Exception("Invalid number of exchange options")
 
         elif state_type is StateType.REQUESTING_BLOCK:
             action, _, _ = state['Pending Action']
@@ -134,11 +137,11 @@ class Player:
         return self.name == other.name
 
     def __copy__(self):
-        copied_player = Player(self.name, self.turn, None, self.ui)
-        copied_player.hidden_cards = self.hidden_cards[:]
-        copied_player.flipped_cards = self.flipped_cards[:]
-        copied_player.coins = self.coins
-        return copied_player
+        new_player = Player(self.name, self.turn, None, self.ui)
+        new_player.hidden_cards = self.hidden_cards[:]
+        new_player.flipped_cards = self.flipped_cards[:]
+        new_player.coins = self.coins
+        return new_player
 
     def __gt__(self, other):
         return self.turn > other.turn
